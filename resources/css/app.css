@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[x-cloak] {
+    display: none !important;
+}
+
+@layer base {
+    html {
+        scrollbar-gutter: stable;
+    }
+    .dark {
+        color-scheme: dark;
+    }
+}
+
+.dark .bg-white {
+    background-color: rgb(31 41 55);
+}
+.dark .bg-gray-50 {
+    background-color: rgb(31 41 55);
+}
+.dark .bg-gray-100 {
+    background-color: rgb(17 24 39);
+}
+.dark .bg-gray-200 {
+    background-color: rgb(55 65 81);
+}
+.dark .text-gray-900,
+.dark .text-gray-800 {
+    color: rgb(243 244 246);
+}
+.dark .text-gray-700 {
+    color: rgb(209 213 219);
+}
+.dark .text-gray-600 {
+    color: rgb(209 213 219);
+}
+.dark .text-gray-500 {
+    color: rgb(156 163 175);
+}
+.dark .text-gray-400 {
+    color: rgb(156 163 175);
+}
+.dark .text-gray-300 {
+    color: rgb(107 114 128);
+}
+.dark .border-gray-200,
+.dark .border-gray-100 {
+    border-color: rgb(55 65 81);
+}
+.dark .border-gray-300 {
+    border-color: rgb(75 85 99);
+}
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: rgb(55 65 81);
+}
+.dark input,
+.dark select,
+.dark textarea {
+    background-color: rgb(31 41 55);
+    border-color: rgb(55 65 81);
+    color: rgb(243 244 246);
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+    color: rgb(107 114 128);
+}
+.dark .hover\:bg-gray-50:hover {
+    background-color: rgb(55 65 81);
+}
+.dark .hover\:bg-gray-100:hover {
+    background-color: rgb(55 65 81);
+}
+.dark .hover\:bg-gray-200:hover {
+    background-color: rgb(75 85 99);
+}
+.dark .hover\:text-gray-700:hover,
+.dark .hover\:text-gray-800:hover,
+.dark .hover\:text-gray-900:hover {
+    color: rgb(243 244 246);
+}
+.dark .focus\:bg-gray-100:focus {
+    background-color: rgb(55 65 81);
+}
+.dark .focus\:text-gray-700:focus {
+    color: rgb(243 244 246);
+}
+.dark .focus\:border-gray-300:focus {
+    border-color: rgb(107 114 128);
+}
+.dark .focus\:ring-gray-500:focus {
+    --tw-ring-color: rgb(107 114 128);
+}
+
+@layer components {
+    .table-sticky-first thead th:first-child,
+    .table-sticky-first tbody td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 10;
+    }
+    .table-sticky-first thead th:first-child {
+        z-index: 20;
+        background-color: rgb(249 250 251);
+        box-shadow: inset -1px 0 0 rgb(229 231 235);
+    }
+    .table-sticky-first tbody td:first-child {
+        background-color: #fff;
+        box-shadow: inset -1px 0 0 rgb(229 231 235);
+    }
+    .dark .table-sticky-first thead th:first-child {
+        background-color: rgb(55 65 81);
+        box-shadow: inset -1px 0 0 rgb(75 85 99);
+    }
+    .dark .table-sticky-first tbody td:first-child {
+        background-color: rgb(31 41 55);
+        box-shadow: inset -1px 0 0 rgb(55 65 81);
+    }
+}
