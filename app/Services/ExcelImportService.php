@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Import;
 use App\Models\ImportData;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -248,8 +247,9 @@ class ExcelImportService
             return;
         }
 
-        if ($import->status === 'success' || $import->status === 'appended') {
-            $this->postProcessModelL3($import);
+        if ($import->table_name === 'laporan model l3'
+            && ($import->status === 'success' || $import->status === 'appended')) {
+            app(L3ReportService::class)->reprocessUser($import->user_id);
         }
     }
 
@@ -401,118 +401,5 @@ class ExcelImportService
         }
 
         return $hasValue ? $record : null;
-    }
-
-    /**
-     * Post-process untuk laporan model L3: tambah kolom "Tanggal Cetak" dan "Keterangan".
-     *
-     * - Parse nama file untuk dapat bulan/tahun acuan
-     * - Tanggal Akad sesuai bulan/tahun acuan → Tanggal Cetak = Tanggal Akad, Keterangan = "Bukan Duplikat"
-     * - Tanggal Akad setelah bulan acuan (cetak maju) → Tanggal Cetak = Tanggal Akad,
-     *   Keterangan = "Bukan Duplikat", baris pindah ke bulan akad sehingga tidak terhitung
-     *   pada bulan file; baris berikutnya tetap mewarisi Tanggal Cetak baris sebelumnya
-     * - Status = "RUSAK" (buku rusak, Tanggal Akad kosong) → Tanggal Cetak =
-     *   Tanggal Cetak baris sebelumnya, Keterangan = "Rusak" (bukan Duplikat)
-     * - Tanggal Akad sebelum bulan acuan (cetak ulang/tanpa tanggal) → Tanggal Cetak =
-     *   Tanggal Cetak baris sebelumnya (atau tanggal dari file), Keterangan = "Duplikat"
-     */
-    private function postProcessModelL3(Import $import): void
-    {
-        if ($import->table_name !== 'laporan model l3') {
-            return;
-        }
-
-        $fileDate = Import::parseFileDate($import->file_name);
-
-        if ($fileDate === null) {
-            return;
-        }
-
-        $rows = $import->importData()->orderBy('row_number')->get();
-
-        if ($rows->isEmpty()) {
-            return;
-        }
-
-        $hasTanggalAkad = false;
-
-        foreach ($rows as $row) {
-            $data = is_string($row->row_data) ? json_decode($row->row_data, true) : $row->row_data;
-            if (is_array($data) && array_key_exists('Tanggal Akad', $data)) {
-                $hasTanggalAkad = true;
-                break;
-            }
-        }
-
-        if (! $hasTanggalAkad) {
-            return;
-        }
-
-        $refDate = Carbon::createFromDate($fileDate['year'], $fileDate['month'], 1);
-        $refEnd = $refDate->copy()->endOfMonth();
-        $refMonth = $fileDate['month'];
-        $refYear = $fileDate['year'];
-        $prevTanggalCetak = $refDate->toDateString();
-        $now = now()->toDateTimeString();
-
-        foreach ($rows as $row) {
-            $data = is_string($row->row_data) ? json_decode($row->row_data, true) : $row->row_data;
-
-            if (! is_array($data) || ! array_key_exists('Tanggal Akad', $data)) {
-                continue;
-            }
-
-            $statusRusak = mb_strtoupper(trim((string) ($data['Status'] ?? ''))) === 'RUSAK';
-            $tanggalAkad = $data['Tanggal Akad'];
-            $akadState = 'lampau';
-
-            if ($tanggalAkad !== null && $tanggalAkad !== '') {
-                try {
-                    $date = Carbon::parse($tanggalAkad);
-                    if ($date->month === $refMonth && $date->year === $refYear) {
-                        $akadState = 'sesuai';
-                    } elseif ($date->greaterThan($refEnd)) {
-                        $akadState = 'maju';
-                    }
-                } catch (\Throwable) {
-                    // tanggal tidak bisa di-parse → anggap cetak ulang (lampau)
-                }
-            }
-
-            $newData = [];
-
-            foreach ($data as $key => $value) {
-                $newData[$key] = $value;
-
-                if ($key === 'Tanggal Akad') {
-                    if ($statusRusak) {
-                        $newData['Tanggal Cetak'] = $prevTanggalCetak;
-                        $newData['Keterangan'] = 'Rusak';
-                    } elseif ($akadState === 'lampau') {
-                        $newData['Tanggal Cetak'] = $prevTanggalCetak;
-                        $newData['Keterangan'] = 'Duplikat';
-                    } else {
-                        $newData['Tanggal Cetak'] = $tanggalAkad;
-                        $newData['Keterangan'] = 'Bukan Duplikat';
-
-                        if ($akadState === 'sesuai') {
-                            $prevTanggalCetak = $tanggalAkad;
-                        }
-                    }
-                }
-            }
-
-            if (! array_key_exists('Tanggal Cetak', $newData)) {
-                $newData['Tanggal Cetak'] = $prevTanggalCetak;
-                $newData['Keterangan'] = $statusRusak
-                    ? 'Rusak'
-                    : ($akadState === 'lampau' ? 'Duplikat' : 'Bukan Duplikat');
-            }
-
-            $row->update([
-                'row_data' => $newData,
-                'updated_at' => $now,
-            ]);
-        }
     }
 }

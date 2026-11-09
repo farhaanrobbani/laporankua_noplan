@@ -465,6 +465,7 @@ class ImportUploaderTest extends TestCase
                 ['2', 'PF-M-002', 'C - D', '2026-10-01'],
                 ['3', 'PF-M-003', 'E - F', '2026-08-15'],
                 ['4', 'PF-M-004', 'G - H', 'bukan-tanggal'],
+                ['5', 'PF-M-005', 'I - J', '2020-01-01'],
             ],
         ], 'laporan-model-l3-09-2026.xlsx');
 
@@ -491,14 +492,18 @@ class ImportUploaderTest extends TestCase
         $this->assertSame('Bukan Duplikat', $rows['PF-M-002']['Keterangan']);
         $this->assertSame('2026-10-01', $rows['PF-M-002']['Tanggal Cetak']);
 
-        // Cetak ulang (akad lampau) → Duplikat, Tanggal Cetak diwarisi dari baris sebelumnya;
-        // baris maju tidak mengubah rantai pewarisan.
-        $this->assertSame('Duplikat', $rows['PF-M-003']['Keterangan']);
+        // Akad bulan sebelumnya masih dalam toleransi 1 bulan → Bukan Duplikat,
+        // Tanggal Cetak diwarisi dari baris sebelumnya.
+        $this->assertSame('Bukan Duplikat', $rows['PF-M-003']['Keterangan']);
         $this->assertSame('2026-09-05', $rows['PF-M-003']['Tanggal Cetak']);
 
         // Tanggal tidak ter-parse → tetap Duplikat.
         $this->assertSame('Duplikat', $rows['PF-M-004']['Keterangan']);
         $this->assertSame('2026-09-05', $rows['PF-M-004']['Tanggal Cetak']);
+
+        // Tanggal jauh di luar toleransi 1 bulan → Duplikat.
+        $this->assertSame('Duplikat', $rows['PF-M-005']['Keterangan']);
+        $this->assertSame('2026-09-05', $rows['PF-M-005']['Tanggal Cetak']);
     }
 
     public function test_l3_status_rusak_tidak_menjadi_duplikat(): void
