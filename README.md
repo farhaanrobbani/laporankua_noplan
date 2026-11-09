@@ -66,7 +66,7 @@ Data persisten disimpan di volume `storage` dan `db_data`. Jangan gunakan
 docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
   > backup-$(date +%F).dump
 
-# pin versi baru di .env: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.0
+# pin versi baru di .env: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.2
 docker compose pull
 docker compose up -d
 ```

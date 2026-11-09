@@ -30,7 +30,7 @@ echo "Edit .env terlebih dahulu:"
 echo "  - KUA_ADMIN_EMAIL / KUA_ADMIN_PASSWORD"
 echo "  - DB_PASSWORD"
 echo "  - APP_URL (dan SESSION_SECURE_COOKIE=true jika HTTPS)"
-echo "  - APP_IMAGE (pin ke versi rilis, mis. ghcr.io/farhaanrobbani/laporankua_noplan:1.1.0)"
+echo "  - APP_IMAGE (pin ke versi rilis, mis. ghcr.io/farhaanrobbani/laporankua_noplan:1.1.2)"
 echo
 echo "Lalu jalankan:"
 echo "  docker compose up -d --build"

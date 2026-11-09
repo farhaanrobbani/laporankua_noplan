@@ -19,7 +19,7 @@ bash bin/docker-init.sh
 #   DB_PASSWORD (kuat)
 #   APP_URL=https://domain-anda.com
 #   SESSION_SECURE_COOKIE=true   (setelah HTTPS)
-#   APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.0
+#   APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.2
 
 # Opsi A: build image di server (paling aman untuk deploy pertama)
 docker compose up -d --build
@@ -56,7 +56,7 @@ docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -
   > backup-$(date +%F-%H%M).dump
 
 # 2. Pin versi baru di .env
-# APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.0
+# APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.2
 
 # 3. Pull & recreate
 docker compose pull
@@ -75,7 +75,7 @@ docker login ghcr.io -u farhaanrobbani
 ### Rollback
 
 ```bash
-# .env: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.0.0
+# .env: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:<tag-sebelumnya>
 docker compose pull
 docker compose up -d
 ```
