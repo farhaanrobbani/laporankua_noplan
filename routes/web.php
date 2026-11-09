@@ -13,6 +13,14 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+Route::get('/version', function () {
+    return response()->json([
+        'name' => config('app.name'),
+        'version' => config('app.version'),
+        'environment' => app()->environment(),
+    ])->header('Cache-Control', 'no-store');
+});
+
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified', 'throttle:120,1'])->name('dashboard');
 

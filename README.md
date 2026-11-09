@@ -1,19 +1,19 @@
 # Laporan — Web Pengolah Laporan
 
-Aplikasi web untuk mengolah data dari file Excel menjadi laporan dalam format **PDF, Word, Excel, dan Print**. User mengupload file Excel, data otomatis tersimpan ke database MySQL, lalu diolah menjadi laporan.
+Aplikasi web untuk mengolah data dari file Excel menjadi laporan dalam format **PDF, Word, Excel, dan Print**. User mengupload file Excel, data otomatis tersimpan ke database MySQL/MariaDB atau PostgreSQL, lalu diolah menjadi laporan.
 
 Versi ini **tanpa plan/premium** dan dirancang untuk **satu KUA = satu instalasi + satu akun admin**. Registrasi publik dinonaktifkan.
 
 ## Stack
 
-- Laravel 13 · PHP 8.5 · MySQL/MariaDB
+- Laravel 13 · PHP 8.5 · MySQL/MariaDB/PostgreSQL
 - Livewire 4 · Alpine.js · Tailwind CSS 3
 - maatwebsite/excel (export) · PhpSpreadsheet (import) · DomPDF · PHPWord
 
 ## Persyaratan
 
-- PHP 8.5 dengan extension: `mbstring`, `xml`, `mysql`, `zip`, `gd`, `curl`, `bcmath`
-- Composer 2 · Node.js · MySQL/MariaDB
+- PHP 8.5 dengan extension: `mbstring`, `xml`, `pdo_mysql`/`pdo_pgsql`, `zip`, `gd`, `curl`, `bcmath`
+- Composer 2 · Node.js · MySQL/MariaDB atau PostgreSQL
 
 ## Instalasi
 
@@ -41,6 +41,40 @@ php85 artisan livewire:publish --assets
 npm install && npm run build
 ```
 
+## Docker (PostgreSQL)
+
+Deploy production cukup dengan Docker Compose. Container `app` berisi Nginx,
+PHP-FPM, queue worker, dan scheduler; container `db` berisi PostgreSQL 17.
+
+```bash
+cp .env.docker.example .env
+bash bin/docker-init.sh          # membuat APP_KEY
+# edit .env: KUA_ADMIN_*, DB_PASSWORD, APP_URL, APP_IMAGE
+
+docker compose up -d --build
+docker compose ps
+curl -fsS http://localhost:8080/up
+```
+
+Data persisten disimpan di volume `storage` dan `db_data`. Jangan gunakan
+`docker compose down -v` di production karena akan menghapus volume tersebut.
+
+### Update & rollback
+
+```bash
+# backup database
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+  > backup-$(date +%F).dump
+
+# pin versi baru di .env: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.0
+docker compose pull
+docker compose up -d
+```
+
+Rollback: ganti `APP_IMAGE` ke tag sebelumnya lalu `docker compose up -d`.
+Jika migrasi tidak kompatibel, restore dump database. Detail alur rilis ada di
+`DEPLOYMENT.md` dan `CHANGELOG.md`.
+
 ## Menjalankan
 
 ```bash
@@ -54,7 +88,7 @@ php85 artisan queue:work --tries=3 --sleep=3 --timeout=120
 ## Testing
 
 ```bash
-php85 artisan test        # 202 test: unit service, auth, dashboard, import, data, report, template, otomasi, policy, security, performa, UI polish
+php85 artisan test        # 203 test: unit service, auth, dashboard, import, data, report, template, otomasi, policy, security, performa, UI polish
 vendor/bin/pint --test    # code style
 
 # Coverage (membangun pcov otomatis bila belum ada, tanpa sudo)
@@ -99,7 +133,7 @@ npm install && npm run build
 #    APP_URL=https://domain-anda.com
 #    APP_ENV=production
 #    APP_DEBUG=false
-#    SESSION_SECURE=true        ← wajib untuk HTTPS
+#    SESSION_SECURE_COOKIE=true ← wajib untuk HTTPS
 #    KUA_ADMIN_*, KUA_*        ← akun admin & identitas KUA
 #    DB_*, MAIL_*, TURNSTILE_*  ← sesuaikan
 

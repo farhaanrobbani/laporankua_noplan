@@ -2,6 +2,109 @@
 
 Panduan deploy aplikasi **Laporan** ke VPS (Ubuntu, Nginx, PHP 8.5, MySQL/MariaDB). Satu instalasi untuk satu KUA dengan satu akun admin.
 
+> Untuk deployment Docker + PostgreSQL, lihat bagian **Docker Compose (PostgreSQL)** di bawah. Cara ini tidak membutuhkan PHP, Composer, atau Node.js di server.
+
+## Docker Compose (PostgreSQL)
+
+### Pertama kali
+
+```bash
+git clone https://github.com/farhaanrobbani/laporankua_noplan.git laporankua
+cd laporankua
+
+cp .env.docker.example .env
+bash bin/docker-init.sh
+# edit .env:
+#   KUA_ADMIN_EMAIL, KUA_ADMIN_PASSWORD
+#   DB_PASSWORD (kuat)
+#   APP_URL=https://domain-anda.com
+#   SESSION_SECURE_COOKIE=true   (setelah HTTPS)
+#   APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.0
+
+# Opsi A: build image di server (paling aman untuk deploy pertama)
+docker compose up -d --build
+
+# Opsi B: pull image rilis yang sudah ada di GHCR
+# docker compose pull && docker compose up -d
+
+docker compose ps
+curl -fsS http://127.0.0.1:8080/up
+```
+
+Entrypoint otomatis menunggu PostgreSQL, menjalankan migrasi, membuat akun admin
+pertama kali (`kua:setup`), dan menyiapkan cache Laravel. Data persisten ada di
+volume `storage` dan `db_data`.
+
+Reverse proxy di host cukup diarahkan ke `127.0.0.1:8080`:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+### Update dari GHCR
+
+```bash
+cd laporankua
+
+# 1. Backup database
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+  > backup-$(date +%F-%H%M).dump
+
+# 2. Pin versi baru di .env
+# APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.0
+
+# 3. Pull & recreate
+docker compose pull
+docker compose up -d
+docker compose ps
+curl -fsS http://127.0.0.1:8080/up
+```
+
+Jika package GHCR private, login sekali di server:
+
+```bash
+docker login ghcr.io -u farhaanrobbani
+# gunakan PAT read:packages; jangan simpan token di repo/chat
+```
+
+### Rollback
+
+```bash
+# .env: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.0.0
+docker compose pull
+docker compose up -d
+```
+
+Migrasi Laravel umumnya forward-only. Jika rilis baru mengubah skema secara
+tidak kompatibel, restore dump database sebelum menjalankan image lama.
+
+### Backup volume
+
+```bash
+# daftar volume
+docker volume ls | grep laporankua
+
+# backup storage (sesuaikan nama volume)
+docker run --rm -v laporankua_storage:/data -v "$PWD":/backup alpine \
+  tar czf /backup/storage-$(date +%F).tgz -C /data .
+```
+
+### Perintah operasional
+
+```bash
+docker compose logs -f app          # log nginx/php/queue
+docker compose exec app supervisorctl status
+docker compose restart app          # restart app + worker
+docker compose exec app php artisan queue:failed
+docker compose exec app php artisan migrate:status
+docker compose exec app php artisan about
+```
+
 ## 1. Persiapan server
 
 ```bash
