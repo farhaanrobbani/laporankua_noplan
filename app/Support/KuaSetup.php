@@ -14,8 +14,8 @@ class KuaSetup
     public static function ensureAdmin(array $input = []): User
     {
         $production = app()->environment('production');
-        $email = trim((string) ($input['email'] ?? config('kua.admin_email') ?? ($production ? '' : 'admin@example.com')));
-        $password = (string) ($input['password'] ?? config('kua.admin_password') ?? ($production ? '' : 'password'));
+        $email = trim((string) (($input['email'] ?? config('kua.admin_email')) ?: ($production ? '' : 'admin@example.com')));
+        $password = (string) (($input['password'] ?? config('kua.admin_password')) ?: ($production ? '' : 'password'));
         $name = trim((string) ($input['name'] ?? config('kua.admin_name', 'Admin KUA')));
 
         if ($email === '') {

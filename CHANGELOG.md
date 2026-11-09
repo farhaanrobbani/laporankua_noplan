@@ -5,6 +5,12 @@ Semua perubahan penting dicatat di file ini. Format mengikuti
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-11-09
+
+### Fixed
+
+- `kua:setup` dan `DatabaseSeeder` memakai akun admin default di non-production saat `KUA_ADMIN_EMAIL`/`KUA_ADMIN_PASSWORD` kosong.
+
 ## [1.1.1] - 2026-11-09
 
 ### Fixed
