@@ -5,6 +5,12 @@ Semua perubahan penting dicatat di file ini. Format mengikuti
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-11-09
+
+### Fixed
+
+- Menaikkan `memory_limit` PHPUnit ke 512M agar test ekspor ZIP tidak kehabisan memori di CI.
+
 ## [1.1.0] - 2026-11-08
 
 ### Added
