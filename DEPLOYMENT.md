@@ -12,30 +12,39 @@ Panduan deploy aplikasi **Laporan** ke VPS (Ubuntu, Nginx, PHP 8.5, MySQL/MariaD
 git clone https://github.com/farhaanrobbani/laporankua_noplan.git laporankua
 cd laporankua
 
-cp .env.docker.example .env
+cp .env.docker.example .env.docker
 bash bin/docker-init.sh
-# edit .env:
-#   KUA_ADMIN_EMAIL, KUA_ADMIN_PASSWORD
-#   DB_PASSWORD (kuat)
+# edit .env.docker:
+#   KUA_ADMIN_EMAIL, KUA_ADMIN_PASSWORD (jangan default)
+#   DB_PASSWORD (kuat, jangan default)
 #   APP_URL=https://domain-anda.com
-#   SESSION_SECURE_COOKIE=true   (setelah HTTPS)
-#   APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.2
+#   SESSION_SECURE_COOKIE=true
+#   APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.3
+#   APP_BIND=127.0.0.1
 
 # Opsi A: build image di server (paling aman untuk deploy pertama)
-docker compose up -d --build
+docker compose --env-file .env.docker up -d --build
 
 # Opsi B: pull image rilis yang sudah ada di GHCR
-# docker compose pull && docker compose up -d
+# docker compose --env-file .env.docker pull
+# docker compose --env-file .env.docker up -d
 
-docker compose ps
+docker compose --env-file .env.docker ps
 curl -fsS http://127.0.0.1:8080/up
 ```
 
 Entrypoint otomatis menunggu PostgreSQL, menjalankan migrasi, membuat akun admin
-pertama kali (`kua:setup`), dan menyiapkan cache Laravel. Data persisten ada di
-volume `storage` dan `db_data`.
+pertama kali (`kua:setup`), dan menyiapkan cache Laravel. `.env.docker` tidak
+masuk repo/image. Startup production ditolak jika `DB_PASSWORD` atau
+`KUA_ADMIN_PASSWORD` masih kosong/default. Data persisten ada di volume
+`storage` dan `db_data`.
 
-Reverse proxy di host cukup diarahkan ke `127.0.0.1:8080`:
+Jika sebelumnya deployment Docker memakai `.env`, salin nilai production ke
+`.env.docker` sebelum update. Selalu jalankan compose dengan
+`--env-file .env.docker`.
+
+Port host default hanya loopback (`APP_BIND=127.0.0.1`). Reverse proxy di host
+cukup diarahkan ke `127.0.0.1:8080`:
 
 ```nginx
 location / {
@@ -52,18 +61,28 @@ location / {
 cd laporankua
 
 # 1. Backup database
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
+docker compose --env-file .env.docker exec -T db sh -c \
+  'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
   > backup-$(date +%F-%H%M).dump
 
-# 2. Pin versi baru di .env
-# APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.2
+# 2. Backup storage (sesuaikan nama volume)
+docker run --rm -v laporankua_storage:/data -v "$PWD":/backup alpine \
+  tar czf /backup/storage-$(date +%F-%H%M).tgz -C /data .
 
-# 3. Pull & recreate
-docker compose pull
-docker compose up -d
-docker compose ps
+# 3. Pin versi baru di .env.docker
+# APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.3
+
+# 4. Pull & recreate
+docker compose --env-file .env.docker pull
+docker compose --env-file .env.docker up -d
+docker compose --env-file .env.docker ps
 curl -fsS http://127.0.0.1:8080/up
+curl -fsS http://127.0.0.1:8080/version
 ```
+
+Container `app` memakai `stop_grace_period` 300 detik dan queue worker diberi
+`stopwaitsecs` 150 detik, jadi restart/deploy bisa menunggu hingga sekitar 5
+menit agar job import yang sedang berjalan selesai.
 
 Jika package GHCR private, login sekali di server:
 
@@ -72,12 +91,29 @@ docker login ghcr.io -u farhaanrobbani
 # gunakan PAT read:packages; jangan simpan token di repo/chat
 ```
 
+### Reprocess L3 setelah update
+
+Fix duplikat L3 tersedia mulai `v1.1.3`. Setelah image baru berjalan:
+
+```bash
+# hitung dampak tanpa menyimpan
+docker compose --env-file .env.docker exec -u www-data app \
+  php artisan l3:reprocess --all --dry-run
+
+# jika hasilnya sesuai, terapkan
+docker compose --env-file .env.docker exec -u www-data app \
+  php artisan l3:reprocess --all
+```
+
+Jalankan saat trafik rendah karena command ini membaca dan memperbarui seluruh
+data L3. Backup database wajib dilakukan sebelum menjalankannya.
+
 ### Rollback
 
 ```bash
-# .env: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:<tag-sebelumnya>
-docker compose pull
-docker compose up -d
+# .env.docker: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:<tag-sebelumnya>
+docker compose --env-file .env.docker pull
+docker compose --env-file .env.docker up -d
 ```
 
 Migrasi Laravel umumnya forward-only. Jika rilis baru mengubah skema secara
@@ -97,12 +133,12 @@ docker run --rm -v laporankua_storage:/data -v "$PWD":/backup alpine \
 ### Perintah operasional
 
 ```bash
-docker compose logs -f app          # log nginx/php/queue
-docker compose exec app supervisorctl status
-docker compose restart app          # restart app + worker
-docker compose exec app php artisan queue:failed
-docker compose exec app php artisan migrate:status
-docker compose exec app php artisan about
+docker compose --env-file .env.docker logs -f app
+docker compose --env-file .env.docker exec app supervisorctl status
+docker compose --env-file .env.docker restart app
+docker compose --env-file .env.docker exec -u www-data app php artisan queue:failed
+docker compose --env-file .env.docker exec -u www-data app php artisan migrate:status
+docker compose --env-file .env.docker exec -u www-data app php artisan about
 ```
 
 ## 1. Persiapan server
@@ -263,7 +299,7 @@ php8.5 artisan up
 
 ## Checklist Go-Live
 
-- [ ] `.env` produksi (`APP_DEBUG=false`, kredensial kuat)
+- [ ] `.env`/`.env.docker` produksi (`APP_DEBUG=false`, kredensial kuat, bukan default)
 - [ ] `migrate --force` sukses
 - [ ] `storage:link` + izin `www-data`
 - [ ] Nginx aktif, `nginx -t` lolos

@@ -43,37 +43,51 @@ npm install && npm run build
 
 ## Docker (PostgreSQL)
 
-Deploy production cukup dengan Docker Compose. Container `app` berisi Nginx,
-PHP-FPM, queue worker, dan scheduler; container `db` berisi PostgreSQL 17.
+Deploy production dengan Docker Compose. Container `app` berisi Nginx, PHP-FPM,
+queue worker, dan scheduler; container `db` berisi PostgreSQL 17. Env Docker
+dipisah di `.env.docker` agar tidak menimpa `.env` pengembangan.
 
 ```bash
-cp .env.docker.example .env
-bash bin/docker-init.sh          # membuat APP_KEY
-# edit .env: KUA_ADMIN_*, DB_PASSWORD, APP_URL, APP_IMAGE
+cp .env.docker.example .env.docker
+bash bin/docker-init.sh          # membuat APP_KEY di .env.docker
+# edit .env.docker: KUA_ADMIN_*, DB_PASSWORD, APP_URL, APP_IMAGE,
+#                   SESSION_SECURE_COOKIE=true untuk HTTPS
 
-docker compose up -d --build
-docker compose ps
-curl -fsS http://localhost:8080/up
+docker compose --env-file .env.docker up -d --build
+docker compose --env-file .env.docker ps
+curl -fsS http://127.0.0.1:8080/up
 ```
 
-Data persisten disimpan di volume `storage` dan `db_data`. Jangan gunakan
-`docker compose down -v` di production karena akan menghapus volume tersebut.
+Port default hanya `127.0.0.1:8080` (`APP_BIND`/`APP_PORT`), sehingga akses
+publik lewat reverse proxy HTTPS. Entrypoint menolak start jika `DB_PASSWORD`
+atau `KUA_ADMIN_PASSWORD` masih default/kosong. Data persisten disimpan di
+volume `storage` dan `db_data`; jangan gunakan `docker compose down -v` di
+production karena akan menghapus volume tersebut.
 
 ### Update & rollback
 
 ```bash
 # backup database
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' \
-  > backup-$(date +%F).dump
+docker compose --env-file .env.docker exec -T db sh -c \
+  'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > backup-$(date +%F).dump
 
-# pin versi baru di .env: APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.2
-docker compose pull
-docker compose up -d
+# pin versi baru di .env.docker:
+# APP_IMAGE=ghcr.io/farhaanrobbani/laporankua_noplan:1.1.3
+docker compose --env-file .env.docker pull
+docker compose --env-file .env.docker up -d
 ```
 
-Rollback: ganti `APP_IMAGE` ke tag sebelumnya lalu `docker compose up -d`.
-Jika migrasi tidak kompatibel, restore dump database. Detail alur rilis ada di
-`DEPLOYMENT.md` dan `CHANGELOG.md`.
+Setelah update, cek `/version` lalu reprocess L3:
+
+```bash
+docker compose --env-file .env.docker exec -u www-data app \
+  php artisan l3:reprocess --all --dry-run
+```
+
+Jika hasil dry-run sudah benar, jalankan tanpa `--dry-run`. Rollback: ganti
+`APP_IMAGE` ke tag sebelumnya lalu `up -d`. Jika migrasi tidak kompatibel,
+restore dump database. Detail alur rilis ada di `DEPLOYMENT.md` dan
+`CHANGELOG.md`.
 
 ## Menjalankan
 
@@ -113,7 +127,7 @@ Dokumentasi lengkap: `PRD.md`, `ARCHITECTURE.md`, `DESIGN.md`, `TASKS.md`, `AGEN
 
 ## Catatan Produksi
 
-- Simpan kredensial hanya di `.env` (jangan commit `.env`).
+- Simpan kredensial hanya di `.env` atau `.env.docker` (keduanya jangan di-commit).
 - Tidak ada plan/premium atau lisensi Otomasi; semua fitur tersedia untuk akun admin KUA.
 - Registrasi publik nonaktif. Akun dibuat/diperbarui dengan `php artisan kua:setup`.
 - `config/database.php` menggunakan `DB_PREFIX` (mis. `laporan_`) dan `DB_MIGRATIONS_TABLE` bila database dipakai bersama aplikasi lain.

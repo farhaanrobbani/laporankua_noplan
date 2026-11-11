@@ -12,6 +12,20 @@ fail() {
     exit 1
 }
 
+is_default_secret() {
+    local value="${1:-}"
+    value="${value,,}"
+
+    case "$value" in
+        ''|password|password123|admin|admin123|changeme|change-me|secret|postgres|laporan|ubah-password-*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 : "${DB_HOST:=db}"
 : "${DB_PORT:=5432}"
 : "${DB_DATABASE:=laporan}"
@@ -42,6 +56,24 @@ mkdir -p \
 
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R ug+rwX storage bootstrap/cache
+
+if [ "${APP_ENV:-production}" = "production" ]; then
+    if is_default_secret "${DB_PASSWORD:-}"; then
+        fail "DB_PASSWORD masih kosong/default. Ganti di .env.docker sebelum start."
+    fi
+
+    if [ "${APP_DEBUG:-false}" = "true" ]; then
+        log "PERINGATAN: APP_DEBUG=true di production."
+    fi
+fi
+
+case "${APP_URL:-}" in
+    https://*)
+        if [ "${SESSION_SECURE_COOKIE:-false}" != "true" ]; then
+            log "PERINGATAN: APP_URL HTTPS tetapi SESSION_SECURE_COOKIE bukan true."
+        fi
+        ;;
+esac
 
 if [ "${WAIT_FOR_DB:-true}" = "true" ]; then
     log "Menunggu database ${DB_HOST}:${DB_PORT}..."
@@ -74,6 +106,14 @@ fi
 
 if [ "${AUTO_KUA_SETUP:-true}" = "true" ] \
     && { [ ! -f storage/app/.kua-setup-done ] || [ "${KUA_FORCE_SETUP:-false}" = "true" ]; }; then
+    if [ -z "${KUA_ADMIN_EMAIL:-}" ]; then
+        fail "KUA_ADMIN_EMAIL wajib diisi saat kua:setup dijalankan."
+    fi
+
+    if is_default_secret "${KUA_ADMIN_PASSWORD:-}"; then
+        fail "KUA_ADMIN_PASSWORD masih kosong/default. Ganti di .env.docker."
+    fi
+
     run_artisan kua:setup
     touch storage/app/.kua-setup-done
     chown www-data:www-data storage/app/.kua-setup-done
